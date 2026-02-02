@@ -19,6 +19,12 @@ function App() {
     setStatus("COMPLETED");
   };
 
+  const handleReset = () => {
+    setStatus("IDLE");
+    setScanId(null);
+    setScanData(null);
+  };
+
   return (
     <div className="min-h-screen bg-primary text-white p-6 font-sans selection:bg-accent selection:text-white print:bg-white print:text-black print:p-0">
       <div className="max-w-6xl mx-auto print:max-w-none print:mx-0">
@@ -57,11 +63,11 @@ function App() {
 
           {status === "COMPLETED" && scanData && (
             <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-              <ReportView scanData={scanData} />
+              <ReportView scanData={scanData} onNewScan={handleReset} />
 
               <div className="mt-12 text-center print:hidden">
                 <button
-                  onClick={() => { setStatus("IDLE"); setScanId(null); setScanData(null); }}
+                  onClick={handleReset}
                   className="text-slate-500 hover:text-white underline transition-colors"
                 >
                   Start New Scan

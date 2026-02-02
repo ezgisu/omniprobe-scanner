@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Download, Upload, Filter, AlertTriangle, CheckCircle, Info, Code, Eye, EyeOff, Server, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Download, Upload, Filter, AlertTriangle, CheckCircle, Info, Code, Eye, EyeOff, Server, ChevronDown, ChevronUp, ExternalLink, Radar } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -167,7 +167,7 @@ const FindingCard = ({ group, isExpanded, onToggle, excluded, onExcludeToggle })
     );
 };
 
-const ReportView = ({ scanData }) => {
+const ReportView = ({ scanData, onNewScan }) => {
     const [excludedGroups, setExcludedGroups] = useState(new Set());
     const [logo, setLogo] = useState(null);
     const [expandedGroups, setExpandedGroups] = useState(new Set()); // Which cards are open
@@ -255,13 +255,23 @@ const ReportView = ({ scanData }) => {
                     <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
                 </label>
 
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-blue-600 text-white rounded font-bold shadow-lg transition-all active:scale-95"
-                >
-                    <Download size={18} />
-                    Export PDF
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onNewScan}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors"
+                    >
+                        <Radar size={18} />
+                        New Scan
+                    </button>
+
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-pink-600 text-white rounded font-bold shadow-lg transition-all active:scale-95"
+                    >
+                        <Download size={18} />
+                        Export PDF
+                    </button>
+                </div>
             </div>
 
             {/* REPORT HEADER */}
