@@ -18,6 +18,10 @@ def run_command(command, scan_id=None, scans=None, stream_handler=None):
         if scan_id and scans:
              scans[scan_id]["logs"].append(f"$ {command}")
              print(f"[{scan_id}] EXEC: {command}")
+             
+             # check stop signal
+             if scans[scan_id].get("status") == "STOPPED":
+                 return ""
 
         # Merging stderr into stdout to prevent deadlock and simplify streaming
         process = subprocess.Popen(
@@ -29,6 +33,11 @@ def run_command(command, scan_id=None, scans=None, stream_handler=None):
             bufsize=1,
             universal_newlines=True
         )
+        
+        # Track process if scan_id provided
+        if scan_id and scans:
+            scans[scan_id]["_process"] = process
+
         
         # Read stdout line by line
         while True:
@@ -440,5 +449,27 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
         err_msg = f"Critical Scan Error: {e}"
         print(err_msg)
         scans[scan_id]["status"] = "FAILED"
+        scans[scan_id]["error"] = str(e)
         if scan_id and scans:
            scans[scan_id]["logs"].append(f"[ERROR] {err_msg}")
+
+def terminate_scan(scan_id: str, scans: dict):
+    """Stop a running scan."""
+    if scan_id in scans:
+        scan = scans[scan_id]
+        scan["status"] = "STOPPED"
+        scan["logs"].append("[WARN] Scan Process Terminated by User.")
+        
+        # Kill the subprocess if alive
+        proc = scan.get("_process")
+        if proc:
+            try:
+                proc.terminate()
+                proc.wait(timeout=1)
+            except:
+                try:
+                    proc.kill()
+                except:
+                    pass
+        return True
+    return False

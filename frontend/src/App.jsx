@@ -57,7 +57,12 @@ function App() {
 
           {status === "RUNNING" && (
             <div className="min-h-[50vh] flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
-              <ProgressBar scanId={scanId} onComplete={handleScanComplete} />
+              <ProgressBar
+                scanId={scanId}
+                onComplete={handleScanComplete}
+                onScanStart={handleScanStart}
+                onReset={handleReset}
+              />
             </div>
           )}
 
