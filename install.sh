@@ -81,18 +81,43 @@ install_go_tool "nuclei" "github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
 install_go_tool "katana" "github.com/projectdiscovery/katana/cmd/katana"
 install_go_tool "httpx" "github.com/projectdiscovery/httpx/cmd/httpx"
 
-# 4. Install Wapiti (Via Pip - Universal)
+# 4. Install Wapiti (Universal Fallback: pipx -> pip3)
 echo -e "${BLUE}[*] Checking Wapiti...${NC}"
 if is_installed "wapiti"; then
     echo -e "${GREEN}[✔] wapiti is already installed. Skipping.${NC}"
 else
-    echo -e "${BLUE}[*] Installing Wapiti via pip3 (Global)...${NC}"
-    # Use --break-system-packages if on managed python env (newer linux/mac), otherwise normal pip
-    if pip3 install wapiti3 --break-system-packages &> /dev/null; then
-        echo -e "${GREEN}[✔] Wapiti installed successfully.${NC}"
-    else
-        echo -e "${BLUE}[*] Retrying standard pip install...${NC}"
-        pip3 install wapiti3
+    INSTALLED=false
+
+    # Method 1: pipx (Preferred for isolation if available)
+    if is_installed "pipx"; then
+        echo -e "${BLUE}[*] pipx detected. Attempting 'pipx install wapiti3'...${NC}"
+        if pipx install wapiti3; then
+            echo -e "${GREEN}[✔] Wapiti installed via pipx.${NC}"
+            INSTALLED=true
+        fi
+    fi
+
+    # Method 2: pip3 with --break-system-packages (Modern Managed Environments)
+    if [ "$INSTALLED" = false ]; then
+        echo -e "${BLUE}[*] Attempting install via pip3 (--break-system-packages)...${NC}"
+        if pip3 install wapiti3 --break-system-packages; then
+            echo -e "${GREEN}[✔] Wapiti installed via pip3.${NC}"
+            INSTALLED=true
+        fi
+    fi
+
+    # Method 3: Standard pip3 (Legacy/Standard Environments)
+    if [ "$INSTALLED" = false ]; then
+        echo -e "${BLUE}[*] Attempting standard 'pip3 install wapiti3'...${NC}"
+        if pip3 install wapiti3; then
+            echo -e "${GREEN}[✔] Wapiti installed via pip3.${NC}"
+            INSTALLED=true
+        fi
+    fi
+
+    if [ "$INSTALLED" = false ]; then
+        echo -e "${RED}[!] Failed to automatically install Wapiti.${NC}"
+        echo -e "${RED}    Please run: 'pipx install wapiti3' OR 'pip3 install wapiti3' manually.${NC}"
     fi
 fi
 
