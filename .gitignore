@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.py[cod]
+
+# System
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Config
+.env
+.env.local
+
+# Backups & Archives
+backups/
+*.zip
+*.tar.gz
+*.rar
+
+# IDEs
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100;
+  }
+}
+
+/* Print Specific Overrides */
+@media print {
+  @page {
+    margin: 15mm;
+    /* Standard document margins */
+    size: auto;
+  }
+
+  body {
+    background-color: white !important;
+    color: black !important;
+    padding: 0 !important;
+    /* Let page margins handle spacing */
+  }
+
+  /* Force background colors to print (for severity badges) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide typical UI elements */
+  .no-print {
+    display: none !important;
+  }
+}
