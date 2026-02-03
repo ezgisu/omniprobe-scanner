@@ -9,7 +9,6 @@
   - **Service Discovery:** Httpx for identifying live web services.
   - **Deep Crawling:** Katana for exploring endpoints, JavaScript files, and APIs.
   - **Vulnerability Scanning:** Nuclei (Light/Deep modes) for detecting CVEs and misconfigurations.
-  - **Vulnerability Scanning:** Nuclei (Light/Deep modes) for detecting CVEs and misconfigurations.
   - **Fuzzing (Deep Mode):** Wapiti for advanced SQL Injection and XSS testing.
   - **Specialized Scan:** Automatic detection of CMS (WordPress) and deep plugin scanning via **wpprobe**.
 - **Modern Web UI:**
@@ -65,7 +64,6 @@ This project wraps several open-source security tools. Please ensure you comply 
 | **Nmap** | Network Discovery & Security Auditing | NPSL (Custom) | [nmap.org](https://nmap.org) |
 | **Nuclei** | Template-based Vulnerability Scanner | MIT | [ProjectDiscovery](https://github.com/projectdiscovery/nuclei) |
 | **Katana** | Next-generation Crawling & Spidering | MIT | [ProjectDiscovery](https://github.com/projectdiscovery/katana) |
-| **Httpx** | Fast & multi-purpose HTTP toolkit | MIT | [ProjectDiscovery](https://github.com/projectdiscovery/httpx) |
 | **Httpx** | Fast & multi-purpose HTTP toolkit | MIT | [ProjectDiscovery](https://github.com/projectdiscovery/httpx) |
 | **Wapiti** | Web Application Vulnerability Scanner | GPLv2 | [Wapiti](https://wapiti.sourceforge.io/) |
 | **WPProbe** | WordPress Plugin Scanner | MIT | [Chocapikk](https://github.com/Chocapikk/wpprobe) |
