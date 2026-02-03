@@ -4,6 +4,7 @@ import json
 import os
 import re
 import uuid
+from urllib.parse import urlparse
 
 # Ensure tools are in path or define absolute paths if needed
 NMAP_PATH = "nmap"
@@ -93,11 +94,28 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
         log(f"Starting {scan_mode.upper()} scan for: {target}")
 
         # Sanitize target for Nmap/Subfinder (expects hostname/IP, not URL)
-        nmap_target = target
-        if "://" in nmap_target:
-            nmap_target = nmap_target.split("://")[1]
-        if nmap_target.endswith("/"):
-            nmap_target = nmap_target[:-1]
+        # Sanitize target for Nmap/Subfinder (expects hostname/IP, not URL)
+        # Handle cases like: https://target.com/path, target.com, http://target.com:8080
+        
+        parsed_target = None
+        if "://" not in target:
+             parsed_target = urlparse(f"http://{target}")
+        else:
+             parsed_target = urlparse(target)
+             
+        # Extract hostname (netloc includes port, so we might strip it for subfinder)
+        nmap_target = parsed_target.netloc
+        
+        # If empty (e.g. input was just /foo), fallback to original but warn
+        if not nmap_target:
+             nmap_target = target
+             
+        # Strip port for Subfinder if present
+        domain_only = nmap_target.split(":")[0] 
+        # Note: Nmap can handle ports, but Subfinder needs domain.
+        # We will use domain_only for subfinder.
+        
+        log(f"Normalized Target: Host={nmap_target}, Domain={domain_only}")
 
         # --- BRANCH: ENUMERATION MODE ---
         if scan_mode == "enumeration":
@@ -107,10 +125,10 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
              log("Starting Enumeration Scan (Recon Mode)...")
              
              # 1. Subfinder
-             log(f"Running Subfinder on {nmap_target}...")
+             log(f"Running Subfinder on {domain_only}...")
              subs_file = f"/tmp/subs_{scan_id}.txt"
              SUBFINDER_PATH = os.path.expanduser("~/go/bin/subfinder")
-             sub_cmd = f"{SUBFINDER_PATH} -d {nmap_target} -o {subs_file} -silent"
+             sub_cmd = f"{SUBFINDER_PATH} -d {domain_only} -o {subs_file} -silent"
              run_command(sub_cmd, scan_id, scans)
              
              subs = []
