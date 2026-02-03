@@ -230,7 +230,15 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
             for port in ports:
                 # Use original nmap_target for formatting standard ports
                 formatted_ports.append(f"{nmap_target}:{port}")
-
+            
+            # CRITICAL FIX: Always include the original user-specified URL (normalized).
+            # If user provided 'target.com/foo', and Nmap found ports on 'target.com',
+            # we must ensures 'http://target.com/foo' is ALSO scanned by Httpx/Katana.
+            if parsed_target:
+                 # Ensure scheme is present (parsed_target from earlier logic has it)
+                 full_user_url = parsed_target.geturl()
+                 if full_user_url not in formatted_ports:
+                     formatted_ports.append(full_user_url)
 
             # --- PHASE 2: HTTPX ---
             scans[scan_id]["progress"] = 30
@@ -240,8 +248,7 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
             targets_file = f"/tmp/targets_{scan_id}.txt"
             with open(targets_file, "w") as f:
                 f.write("\n".join(formatted_ports))
-                if not formatted_ports:
-                    f.write(f"\n{target}")
+                # Fallback removed here as we handled it above
 
             httpx_cmd = f"{HTTPX_PATH} -l {targets_file} -silent -json"
             
