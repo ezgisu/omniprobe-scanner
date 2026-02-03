@@ -87,6 +87,8 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
         scans[scan_id]["status"] = "RUNNING"
         scans[scan_id]["progress"] = 5
         scans[scan_id]["findings"] = []
+        scans[scan_id]["technologies"] = [] # Track detected technologies
+        scans[scan_id]["target_url"] = target # Store target for follow-up scans
         
         log(f"Starting {scan_mode.upper()} scan for: {target}")
 
@@ -298,15 +300,44 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
 
         nuclei_output = run_command(nuclei_cmd, scan_id, scans, stream_handler=nuclei_handler)
         
+        # "Smart Filter" patterns for Info severity to reduce noise
+        # We only filter these if the severity is 'info' or 'unknown'
+        NOISY_INFO_KEYWORDS = [
+            "ssl certificate", "ssl issuer", "tls", "cipher", "mismatched header", 
+            "dns", "cname", "txt record", "missing header", "cookie", "csp", "x-powered-by"
+        ]
+
         nuclei_count = 0
         for line in nuclei_output.splitlines():
             try:
                 finding = json.loads(line)
+                
+                # Tech Detection Logic
+                name = finding.get("info", {}).get("name", "Unknown")
+                tags = finding.get("info", {}).get("tags", [])
+                
+                # Check for WordPress
+                if "wordpress" in name.lower() or "wordpress" in str(tags).lower():
+                    if "wordpress" not in scans[scan_id]["technologies"]:
+                        scans[scan_id]["technologies"].append("wordpress")
+                        log("Technology Detected: WordPress")
+
+                
+                # --- SMART FILTER IMPLEMENTATION ---
+                # Drop "noisy" info items before adding them to our list
+                if severity.lower() in ["info", "unknown"]:
+                    # Check if the name contains any noisy keyword
+                    if any(keyword in name.lower() for keyword in NOISY_INFO_KEYWORDS):
+                        # But KEEP vital info like "Technology", "WAF", "Panel", "Login"
+                        # (The negative check ensures we don't accidentally drop good stuff if it overlaps)
+                        # Actually 'tech' and 'detect' are usually good.
+                        is_vital = any(good in name.lower() for good in ["detect", "technology", "login", "panel", "waf", "version"])
+                        if not is_vital:
+                            continue # Skip this finding
+                # -----------------------------------
+
                 nuclei_count += 1
                 
-                # Map valid severities
-                severity = finding.get("info", {}).get("severity", "info")
-                name = finding.get("info", {}).get("name")
                 description = finding.get("info", {}).get("description", "") or f"Matched template {finding.get('template-id')}"
                 
                 # Additional Metadata
@@ -370,7 +401,7 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
             except:
                 continue
                 
-        log(f"Nuclei finished. Found {nuclei_count} issues.")
+        log(f"Nuclei finished. Found {nuclei_count} relevant issues (filtered noise).")
 
         # --- PHASE 5: WAPITI (DEEP SCAN ONLY) ---
         if scan_mode == "deep":
@@ -472,4 +503,106 @@ def terminate_scan(scan_id: str, scans: dict):
                 except:
                     pass
         return True
+        return True
     return False
+
+def run_wpprobe_scan(scan_id: str, scans: dict):
+    """Execution of specialized WordPress scan using wpprobe."""
+    WPPROBE_PATH = os.path.expanduser("~/go/bin/wpprobe")
+    if scan_id not in scans:
+         return
+    
+    # Needs a target URL. We can infer it from findings or original request.
+    # But main.py doesn't store original target in scan object easily accessible here unless we explicitly stored it.
+    # Fortunately, we can check if we have it in scans (assuming main.py passed it in run_scan). 
+    # But this is a separate process. We need to pass target here or store it.
+    # Let's assume we store target in scan object when starting scan.
+    
+    target = scans[scan_id].get("target_url") 
+    # NOTE: We need to ensure target is stored in scan object in run_scan
+    
+    if not target:
+        scans[scan_id]["logs"].append("[ERROR] Target URL not found for WP scan.")
+        return
+
+    scans[scan_id]["logs"].append(f"Starting Deep WordPress Scan with wpprobe on {target}...")
+    scans[scan_id]["action_status"] = "running" # UI will poll this
+    scans[scan_id]["action_message"] = "Enumerating plugins with wpprobe..."
+    
+    # wpprobe output to json?
+    # CLI help says: -o output_file (json format supported?)
+    # Let's try -o stdout and parse line by line if possible, or file.
+    # Based on search: usually tools support json output.
+    # We will use a temp file.
+    
+    output_file = f"/tmp/wpprobe_{scan_id}.json"
+    # Corrected command based on 'wpprobe scan --help':
+    # - subcommand: scan
+    # - url: -u
+    # - output: -o
+    # - mode: -m (stealthy, bruteforce, hybrid). 'aggressive' was invalid. Using 'hybrid' for deep scan.
+    # - threads: -t (instead of --workers)
+    cmd = f"{WPPROBE_PATH} scan -u {target} -o {output_file} -m hybrid -t 25"
+    
+    run_command(cmd, scan_id, scans)
+    
+    # Parse Output
+    if os.path.exists(output_file):
+        try:
+            with open(output_file, 'r') as f:
+                # wpprobe might output a single JSON object or list
+                # Assuming list or single obj
+                data = json.load(f)
+                
+                # Normalize to list
+                if isinstance(data, dict):
+                    data = [data]
+                
+                findings_count = 0
+                for item in data:
+                    # Map wpprobe logic to our findings
+                    # Structure depends on tool, but generic fallback:
+                    name = item.get("name") or item.get("plugin") or "WordPress Issue"
+                    version = item.get("version", "")
+                    vulns = item.get("vulnerabilities", [])
+                    
+                    if vulns:
+                         for v in vulns:
+                             findings_count += 1
+                             scans[scan_id]["findings"].append({
+                                "id": f"wp-{uuid.uuid4()}",
+                                "tool": "wpprobe",
+                                "name": f"WP Plugin Vuln: {name}",
+                                "severity": "high", # usually vulns are high
+                                "description": v.get("title", "Detected Vulnerability"),
+                                "evidence": f"Plugin: {name} v{version}\nRef: {v.get('references', '')}",
+                                "references": v.get("references", []),
+                                "matched_at": target
+                             })
+                    else:
+                        # Just detected plugin
+                        findings_count += 1
+                        scans[scan_id]["findings"].append({
+                            "id": f"wp-{uuid.uuid4()}",
+                            "tool": "wpprobe",
+                            "name": f"WP Plugin Detected: {name}",
+                            "severity": "info",
+                            "description": f"Found plugin {name} version {version}",
+                            "matched_at": target
+                         })
+
+            scans[scan_id]["logs"].append(f"WPScan Finished. Found {findings_count} WordPress specific items.")
+            scans[scan_id]["action_status"] = "completed" # Success state
+            scans[scan_id]["action_result_count"] = findings_count
+
+            
+        except Exception as e:
+             scans[scan_id]["logs"].append(f"[ERROR] Failed to parse wpprobe output: {e}")
+             scans[scan_id]["action_status"] = "failed"
+    else:
+         scans[scan_id]["logs"].append("[WARN] wpprobe produced no output.")
+         scans[scan_id]["action_status"] = "failed"
+         
+    # scans[scan_id]["action_status"] = "idle" # OLD: Reset status
+
+

@@ -9,9 +9,40 @@ function App() {
   const [status, setStatus] = useState("IDLE"); // IDLE, RUNNING, COMPLETED
   const [scanData, setScanData] = useState(null);
 
+  // Handle URL hash for direct linking
+  React.useEffect(() => {
+    const checkHash = async () => {
+      const hash = window.location.hash;
+      const match = hash.match(/^#\/report\/([a-zA-Z0-9-]+)/);
+      if (match) {
+        const id = match[1];
+        setScanId(id);
+        setStatus("RUNNING"); // Assume running initially to trigger ProgressBar which creates current state loop
+
+        // Optimistically check if it's already done to jump straight to report
+        try {
+          const { data } = await import('axios').then(m => m.default.get(`http://localhost:8000/scan/${id}`));
+          if (data.status === 'COMPLETED' || data.status === 'STOPPED') {
+            setScanData(data);
+            setStatus("COMPLETED");
+          }
+        } catch (e) {
+          console.error("Failed to restore scan from hash", e);
+        }
+      }
+    };
+
+    checkHash();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
   const handleScanStart = (id) => {
     setScanId(id);
     setStatus("RUNNING");
+    window.location.hash = `/report/${id}`;
   };
 
   const handleScanComplete = (data) => {
@@ -23,6 +54,9 @@ function App() {
     setStatus("IDLE");
     setScanId(null);
     setScanData(null);
+    window.location.hash = "";
+    // Clean URL history
+    history.pushState("", document.title, window.location.pathname + window.location.search);
   };
 
   return (

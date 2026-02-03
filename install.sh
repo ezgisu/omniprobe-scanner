@@ -80,6 +80,7 @@ install_go_tool() {
 install_go_tool "nuclei" "github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
 install_go_tool "katana" "github.com/projectdiscovery/katana/cmd/katana"
 install_go_tool "httpx" "github.com/projectdiscovery/httpx/cmd/httpx"
+install_go_tool "wpprobe" "github.com/Chocapikk/wpprobe"
 
 # 4. Install Wapiti (Universal Fallback: pipx -> pip3)
 echo -e "${BLUE}[*] Checking Wapiti...${NC}"

@@ -49,13 +49,38 @@ def stop_scan(scan_id: str):
     else:
         raise HTTPException(status_code=500, detail="Could not stop scan")
 
+class ScanAction(BaseModel):
+    action: str
+
+@app.post("/scan/{scan_id}/action")
+def scan_action(scan_id: str, payload: ScanAction, background_tasks: BackgroundTasks):
+    if scan_id not in scans:
+         raise HTTPException(status_code=404, detail="Scan not found")
+         
+    if payload.action == "wordpress_deep_scan":
+        # Run wpprobe in background
+        background_tasks.add_task(scanner.run_wpprobe_scan, scan_id, scans)
+        return {"status": "action_started", "message": "Deep WordPress scan started."}
+        
+    raise HTTPException(status_code=400, detail="Invalid action")
+
 @app.get("/scan/{scan_id}")
-def get_scan_status(scan_id: str):
+def get_scan_status(scan_id: str, summary: bool = False):
     if scan_id not in scans:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    # Filter out internal keys (like _process) that are not serializable
+    # Filter out internal keys
     scan_data = {k: v for k, v in scans[scan_id].items() if not k.startswith("_")}
+    
+    if summary:
+        # Exclude heavy fields for polling
+        scan_data.pop("findings", None)
+        # logs might be needed for live view, but maybe we can optimize that too?
+        # unique logic: if summary, maybe keep logs? 
+        # User wants live logs. logs are just strings, usually okay unless HUGE.
+        # But 'findings' is the main culprit.
+        pass
+        
     return scan_data
 
 @app.get("/report/{scan_id}")

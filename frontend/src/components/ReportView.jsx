@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Download, Upload, Filter, AlertTriangle, CheckCircle, Info, Code, Eye, EyeOff, Server, ChevronDown, ChevronUp, ExternalLink, Radar } from 'lucide-react';
+import axios from 'axios';
+import { Download, Upload, Filter, AlertTriangle, CheckCircle, Info, Code, Eye, EyeOff, Server, ChevronDown, ChevronUp, ExternalLink, Radar, Zap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -25,9 +26,9 @@ const SeverityBadge = ({ severity }) => {
 };
 
 const FindingCard = ({ group, isExpanded, onToggle, excluded, onExcludeToggle }) => {
-    const representative = group.findings[0];
+    const representative = group.findings?.[0] || {};
     const { name, severity, description, references, tool } = representative;
-    const count = group.findings.length;
+    const count = group.findings?.length || 0;
 
     // Impact generation (Generic based on severity as fallback)
     const getPossibleImpact = (sev) => {
@@ -168,17 +169,78 @@ const FindingCard = ({ group, isExpanded, onToggle, excluded, onExcludeToggle })
 };
 
 const ReportView = ({ scanData, onNewScan }) => {
+    // Force re-render when data updates (handled by parent usually, but we might need local refresh)
+    const [localScanData, setLocalScanData] = useState(scanData);
+
+    // Sync local state when prop changes
+    React.useEffect(() => {
+        setLocalScanData(scanData);
+    }, [scanData]);
+
     const [excludedGroups, setExcludedGroups] = useState(new Set());
     const [logo, setLogo] = useState(null);
     const [expandedGroups, setExpandedGroups] = useState(new Set()); // Which cards are open
+    const [muteInfo, setMuteInfo] = useState(false);
+    const [isActionRunning, setIsActionRunning] = useState(false);
+    const [actionResultMsg, setActionResultMsg] = useState(null);
+
+    const handleAction = async (actionType) => {
+        try {
+            setIsActionRunning(true);
+            await axios.post(`http://localhost:8000/scan/${localScanData.id}/action`, { action: actionType });
+            // Polling will handle the rest
+        } catch (e) {
+            console.error(e);
+            alert("Failed to start action: " + e.message);
+            setIsActionRunning(false);
+        }
+    };
+
+    // Poll for changes if action is running or we just loaded and it might be running
+    React.useEffect(() => {
+        let interval;
+        // Check if we need to poll (either locally knowing it's running, or checking if backend says so)
+        // We always poll a bit slowly to catch running actions if we refreshed page
+
+        const pollStatus = async () => {
+            try {
+                // Fetch status
+                const response = await axios.get(`http://localhost:8000/scan/${localScanData.id}?summary=true`);
+                const latest = response.data;
+
+                // Check if action status changed
+                if (latest.action_status === 'running') {
+                    setIsActionRunning(true);
+                } else if (isActionRunning && latest.action_status !== 'running') {
+                    // It finished! Refresh FULL data
+                    setIsActionRunning(false);
+                    const fullResponse = await axios.get(`http://localhost:8000/scan/${localScanData.id}`);
+                    setLocalScanData(fullResponse.data);
+
+                    if (fullResponse.data.action_result_count !== undefined) {
+                        setActionResultMsg(`Action completed! Found ${fullResponse.data.action_result_count} new finding(s).`);
+                    }
+                }
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        };
+
+        if (isActionRunning || (localScanData.technologies?.includes('wordpress'))) {
+            interval = setInterval(pollStatus, 2000);
+        }
+
+        return () => clearInterval(interval);
+    }, [isActionRunning, localScanData.id, localScanData.technologies]);
 
     // 1. Group Findings
     const groupedFindings = useMemo(() => {
-        if (!scanData || !scanData.findings) return [];
+        if (!localScanData || !Array.isArray(localScanData.findings)) return [];
 
         // Group by Name + Tool
         const groups = {};
-        scanData.findings.forEach(finding => {
+        localScanData.findings.forEach(finding => {
+            if (!finding) return;
             const key = `${finding.tool}-${finding.name}`;
             if (!groups[key]) {
                 groups[key] = {
@@ -199,7 +261,7 @@ const ReportView = ({ scanData, onNewScan }) => {
             const sevB = severityOrder[b.severity?.toLowerCase()] || 0;
             return sevB - sevA; // Descending
         });
-    }, [scanData]);
+    }, [localScanData]);
 
     // 2. Stats Calculation (Filtered)
     const stats = useMemo(() => {
@@ -233,6 +295,20 @@ const ReportView = ({ scanData, onNewScan }) => {
         setExcludedGroups(next);
     }
 
+    const handleToggleMuteInfo = () => {
+        const nextState = !muteInfo;
+        setMuteInfo(nextState);
+
+        const nextExcluded = new Set(excludedGroups);
+        groupedFindings.forEach(g => {
+            if (g.severity === 'info' || g.severity === 'unknown') {
+                if (nextState) nextExcluded.add(g.id);
+                else nextExcluded.delete(g.id);
+            }
+        });
+        setExcludedGroups(nextExcluded);
+    };
+
     const handleLogoUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -242,7 +318,7 @@ const ReportView = ({ scanData, onNewScan }) => {
         }
     };
 
-    if (!scanData) return null;
+    if (!localScanData) return null;
 
     return (
         <div className="w-full max-w-5xl mx-auto space-y-8 print:w-full print:max-w-none print:space-y-4">
@@ -280,9 +356,9 @@ const ReportView = ({ scanData, onNewScan }) => {
                     <div>
                         <h1 className="text-3xl font-bold text-white mb-2 print:text-black print:text-2xl">Security Assessment Report</h1>
                         <div className="text-slate-400 space-y-1 print:text-slate-600 print:text-sm">
-                            <p>Target: <span className="text-accent font-mono print:text-black print:font-bold">{scanData.target}</span></p>
+                            <p>Target: <span className="text-accent font-mono print:text-black print:font-bold">{localScanData.target}</span></p>
                             <p>Date: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
-                            <p>Scan ID: <span className="font-mono text-xs">{scanData.id}</span></p>
+                            <p>Scan ID: <span className="font-mono text-xs">{localScanData.id}</span></p>
                         </div>
                     </div>
                     {logo ? (
@@ -296,6 +372,54 @@ const ReportView = ({ scanData, onNewScan }) => {
                         </div>
                     )}
                 </div>
+
+                {/* SUGGESTED ACTIONS (Tech Specific) */}
+                {localScanData.technologies?.includes('wordpress') && (
+                    <div className="mb-8 p-6 bg-blue-900/10 border border-blue-500/20 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 print:hidden">
+                        <div>
+                            <h3 className="text-xl font-bold text-blue-400 flex items-center gap-2">
+                                <Zap className="fill-blue-500/20" /> WordPress Detected
+                            </h3>
+                            <p className="text-slate-400 mt-1 text-sm">
+                                We detected WordPress on this target. Run a specialized deep scan to find hidden plugin vulnerabilities?
+                            </p>
+                        </div>
+
+                        {localScanData.action_status === 'completed' ? (
+                            <button disabled className="px-6 py-3 rounded font-bold bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-2 cursor-not-allowed">
+                                <CheckCircle size={18} /> Deep Scan Completed
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => handleAction('wordpress_deep_scan')}
+                                disabled={isActionRunning}
+                                className={cn("px-6 py-3 rounded font-bold shadow-lg transition-all flex items-center gap-2",
+                                    isActionRunning ? "bg-slate-700 cursor-wait text-slate-400" : "bg-blue-600 hover:bg-blue-500 text-white active:scale-95"
+                                )}
+                            >
+                                {isActionRunning ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                                        In Progress...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap size={18} /> Run Deep WP Scan
+                                    </>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Result Notification */}
+                {actionResultMsg && (
+                    <div className="mb-4 -mt-4 p-3 bg-green-500/10 border border-green-500/30 text-green-400 rounded flex items-center gap-2 animate-in fade-in slide-in-from-top-2 print:hidden">
+                        <CheckCircle size={16} />
+                        <span className="font-bold text-sm">{actionResultMsg}</span>
+                        <button onClick={() => setActionResultMsg(null)} className="ml-auto hover:text-white">✕</button>
+                    </div>
+                )}
 
                 {/* EXECUTIVE SUMMARY */}
                 <div className="mb-8 print:mb-6">
@@ -359,6 +483,18 @@ const ReportView = ({ scanData, onNewScan }) => {
                             className="text-xs text-accent hover:underline print:hidden"
                         >
                             {expandedGroups.size === groupedFindings.length ? "Collapse All" : "Expand All"}
+                        </button>
+                    </div>
+
+                    <div className="flex justify-end print:hidden">
+                        <button
+                            onClick={handleToggleMuteInfo}
+                            className={cn("flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border transition-colors",
+                                muteInfo ? "bg-slate-700 text-white border-slate-600" : "bg-transparent text-slate-500 border-slate-700 hover:border-slate-500"
+                            )}
+                        >
+                            {muteInfo ? <EyeOff size={14} /> : <Eye size={14} />}
+                            {muteInfo ? "Unmute Info Findings" : "Mute Info Findings"}
                         </button>
                     </div>
 

@@ -50,7 +50,8 @@ const ProgressBar = ({ scanId, onComplete, onScanStart, onReset }) => {
 
         const interval = setInterval(async () => {
             try {
-                const response = await axios.get(`http://localhost:8000/scan/${scanId}`);
+                // Poll with summary=true to avoid huge payloads (findings list)
+                const response = await axios.get(`http://localhost:8000/scan/${scanId}?summary=true`);
                 const data = response.data;
 
                 // Error Handling
@@ -86,7 +87,9 @@ const ProgressBar = ({ scanId, onComplete, onScanStart, onReset }) => {
 
                 if (data.status === 'COMPLETED') {
                     clearInterval(interval);
-                    onComplete(data);
+                    // Fetch FULL data (with findings) for the report
+                    const fullResponse = await axios.get(`http://localhost:8000/scan/${scanId}`);
+                    onComplete(fullResponse.data);
                 }
             } catch (error) {
                 console.error("Polling error", error);
