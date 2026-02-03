@@ -51,29 +51,47 @@ const InputForm = ({ onScanStart }) => {
             </form>
 
             {/* Scan Mode Selection */}
-            <div className="bg-slate-900 p-1 rounded-lg flex items-center justify-between border border-slate-800">
+            {/* Scan Mode Selection */}
+            <div className="space-y-3">
+                {/* Top: Enumeration Mode (Full Width) */}
                 <button
                     type="button"
-                    onClick={() => setScanMode('light')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${scanMode === 'light'
-                        ? 'bg-slate-700 text-white shadow'
-                        : 'text-slate-500 hover:text-slate-300'
+                    onClick={() => setScanMode('enumeration')}
+                    className={`w-full py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${scanMode === 'enumeration'
+                            ? 'bg-purple-500/10 border-purple-500 text-purple-400 shadow-lg shadow-purple-900/20'
+                            : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-400'
                         }`}
                 >
-                    Light Scan
-                    <span className="block text-[10px] opacity-60 font-normal">Fast • Standard Checks</span>
+                    <span className="font-bold text-lg">Enumeration Mode</span>
+                    <span className="text-xs opacity-70">Recon • UUID Extraction • Subdomains</span>
                 </button>
-                <button
-                    type="button"
-                    onClick={() => setScanMode('deep')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${scanMode === 'deep'
-                        ? 'bg-accent text-white shadow'
-                        : 'text-slate-500 hover:text-slate-300'
-                        }`}
-                >
-                    Deep Scan
-                    <span className="block text-[10px] opacity-80 font-normal text-slate-200">Wapiti Fuzzing • Full Nuclei</span>
-                </button>
+
+                {/* Bottom: Light & Deep (Side by Side) */}
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setScanMode('light')}
+                        className={`py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${scanMode === 'light'
+                                ? 'bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-900/20'
+                                : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-400'
+                            }`}
+                    >
+                        <span className="font-bold">Light Scan</span>
+                        <span className="text-[10px] opacity-70">Fast • Standard Checks</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setScanMode('deep')}
+                        className={`py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${scanMode === 'deep'
+                                ? 'bg-orange-500/10 border-orange-500 text-orange-400 shadow-lg shadow-orange-900/20'
+                                : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-400'
+                            }`}
+                    >
+                        <span className="font-bold">Deep Scan</span>
+                        <span className="text-[10px] opacity-70">Wapiti Fuzzing • Full Nuclei</span>
+                    </button>
+                </div>
             </div>
         </div>
     );

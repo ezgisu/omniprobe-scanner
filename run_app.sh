@@ -25,7 +25,7 @@ cd ..
 # Start Frontend
 echo "Starting Frontend (Port 5173)..."
 cd frontend
-npm run dev > ../frontend.log 2>&1 &
+npm run dev -- --host 0.0.0.0 > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 

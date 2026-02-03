@@ -81,6 +81,8 @@ install_go_tool "nuclei" "github.com/projectdiscovery/nuclei/v3/cmd/nuclei"
 install_go_tool "katana" "github.com/projectdiscovery/katana/cmd/katana"
 install_go_tool "httpx" "github.com/projectdiscovery/httpx/cmd/httpx"
 install_go_tool "wpprobe" "github.com/Chocapikk/wpprobe"
+install_go_tool "subfinder" "github.com/projectdiscovery/subfinder/v2/cmd/subfinder"
+install_go_tool "gau" "github.com/lc/gau/v2/cmd/gau"
 
 # 4. Install Wapiti (Universal Fallback: pipx -> pip3)
 echo -e "${BLUE}[*] Checking Wapiti...${NC}"
