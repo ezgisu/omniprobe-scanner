@@ -231,14 +231,24 @@ def run_scan(scan_id: str, target: str, scans: dict, scan_mode: str = "light"):
                 # Use original nmap_target for formatting standard ports
                 formatted_ports.append(f"{nmap_target}:{port}")
             
-            # CRITICAL FIX: Always include the original user-specified URL (normalized).
-            # If user provided 'target.com/foo', and Nmap found ports on 'target.com',
-            # we must ensures 'http://target.com/foo' is ALSO scanned by Httpx/Katana.
+            # CRITICAL FIX: Ensure COMPREHENSIVE COVERAGE (Root + Specific Path)
+            # 1. Root Domain (e.g. https://target.com) - guarantees high-level checks
+            # 2. Specific Path (e.g. https://target.com/signin) - guarantees path-specific checks
+            
             if parsed_target:
-                 # Ensure scheme is present (parsed_target from earlier logic has it)
+                 # A. Full User URL (Specific Path)
                  full_user_url = parsed_target.geturl()
                  if full_user_url not in formatted_ports:
                      formatted_ports.append(full_user_url)
+                 
+                 # B. Root URL (Scheme + Netloc)
+                 # This ensures we don't miss "root" vulnerabilities if user gave specific path
+                 root_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
+                 if root_url not in formatted_ports and root_url != full_user_url:
+                     formatted_ports.append(root_url)
+            
+            # Deduplicate just in case
+            formatted_ports = list(set(formatted_ports))
 
             # --- PHASE 2: HTTPX ---
             scans[scan_id]["progress"] = 30
